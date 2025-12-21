@@ -8,7 +8,7 @@ typedef struct
     uint8_t A;  // accumulator
     uint8_t X;  // index X
     uint8_t Y;  // index y
-    uint8_t SP; // stack pointer
+    uint8_t S;  // stack pointer
     uint8_t PC; // program counter
     uint8_t P;  // status flags
 } CPU6502;
