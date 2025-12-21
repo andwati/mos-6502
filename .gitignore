@@ -76,5 +76,6 @@ dkms.conf
 
 bin/
 build/
+docs/
 
 # End of https://www.toptal.com/developers/gitignore/api/c,visualstudiocode
