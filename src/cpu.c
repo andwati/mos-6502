@@ -8,6 +8,7 @@ void cpu_reset(CPU6502 *cpu, Bus6502 *bus)
     memset(cpu, 0, sizeof(*cpu));
     cpu->SP = 0xFD;
     cpu->P = FLAG_U | FLAG_I;
+    cpu->decimal_enabled = true;
     cpu->PC = bus_read16(bus, 0xFFFC);
 }
 

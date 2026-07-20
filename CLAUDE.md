@@ -16,6 +16,8 @@ make snake        # assemble and run the SDL game (requires SDL2 + cc65)
 - `Bus6502` owns RAM and Easy6502 MMIO; CPU code only uses bus accessors.
 - `cpu_step` executes one instruction or interrupt and returns status/opcode/cycles.
 - `src/opcode.c` has a 256-entry descriptor table for all 151 official encodings.
+- `src/state.c` owns the portable, versioned state file format.
+- `src/apple1.c` maps Apple I keyboard/display PIA registers through bus hooks.
 - `src/frontend.c` is an optional SDL2 frontend with a dependency-free stub.
 - `tests/run_tests.c` is the in-tree test harness; `tests/run_suite.c` runs external ROMs.
 

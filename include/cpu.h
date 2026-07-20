@@ -13,6 +13,7 @@ typedef struct CPU6502 {
     uint8_t P;
     bool nmi_pending;
     bool irq_asserted;
+    bool decimal_enabled;
 } CPU6502;
 
 enum {

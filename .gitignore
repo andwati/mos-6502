@@ -80,5 +80,8 @@ games/snake.bin
 snake.highscore
 snake.state
 tests/roms/*.bin
+tests/roms/*.nes
+tests/roms/*.log
+tests/vectors/
 
 # End of https://www.toptal.com/developers/gitignore/api/c,visualstudiocode

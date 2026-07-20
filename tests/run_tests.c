@@ -1,7 +1,10 @@
 #include <stdio.h>
 #include <string.h>
 #include "bus.h"
+#include "apple1.h"
 #include "cpu.h"
+#include "state.h"
+#include "nes.h"
 
 static int tests, failures;
 #define CHECK(expr) do { tests++; if (!(expr)) { failures++; fprintf(stderr,"%s:%d: check failed: %s\n",__FILE__,__LINE__,#expr); } } while(0)
@@ -68,9 +71,95 @@ static void test_branches_and_illegal(void)
     b.memory.data[0x8100]=0x02;cpu_step_result_t r=step(&c,&b);CHECK(r.status==CPU_STEP_ILLEGAL_OPCODE);EQ8(r.opcode,0x02);
 }
 
+static void test_stable_undocumented(void)
+{
+    CPU6502 c;Bus6502 b;setup(&c,&b,0x8000);
+    const uint8_t p[]={0xA9,0xF0,0xA2,0xCC,0x87,0x10,0xA7,0x10,0xC7,0x10,
+                       0xE7,0x10,0x0B,0x80,0x4B,0x0F,0xCB,0x01,0x1A};
+    memcpy(&b.memory.data[0x8000],p,sizeof p);
+    step(&c,&b);step(&c,&b);step(&c,&b);EQ8(b.memory.data[0x10],0xC0);
+    step(&c,&b);EQ8(c.A,0xC0);EQ8(c.X,0xC0);
+    step(&c,&b);EQ8(b.memory.data[0x10],0xBF);CHECK(c.P&FLAG_C);
+    c.P|=FLAG_C;step(&c,&b);EQ8(b.memory.data[0x10],0xC0);EQ8(c.A,0x00);CHECK(c.P&FLAG_C);
+    step(&c,&b);EQ8(c.A,0);CHECK(!(c.P&FLAG_C));
+    c.A=0xFF;step(&c,&b);EQ8(c.A,7);CHECK(c.P&FLAG_C);
+    c.A=0xFF;c.X=0x0F;step(&c,&b);EQ8(c.X,0x0E);CHECK(c.P&FLAG_C);
+    EQ8(step(&c,&b).cycles,2);
+}
+
+static void test_portable_state(void)
+{
+    const char *path="/tmp/mos6502-test.state";CPU6502 c,restored;Bus6502 b,out;
+    setup(&c,&b,0x8123);c.A=0x42;c.X=0x77;c.P=FLAG_U|FLAG_C;b.memory.data[0x2345]=0xAB;
+    b.keyboard='d';b.easy6502_io=true;bus_seed_rng(&b,12345);
+    CHECK(state_save(path,&c,&b)==0);bus_init(&out);memset(&restored,0,sizeof restored);
+    CHECK(state_load(path,&restored,&out)==0);EQ16(restored.PC,0x8123);EQ8(restored.A,0x42);
+    EQ8(restored.X,0x77);EQ8(restored.P,FLAG_U|FLAG_C);EQ8(out.memory.data[0x2345],0xAB);
+    EQ8(out.keyboard,'d');CHECK(out.easy6502_io);CHECK(out.rng_state==12345);CHECK(out.framebuffer_dirty);
+    CHECK(restored.decimal_enabled);
+    remove(path);
+}
+
+static void test_2a03_ignores_decimal(void)
+{
+    CPU6502 c;Bus6502 b;setup(&c,&b,0x8000);c.decimal_enabled=false;
+    const uint8_t p[]={0xF8,0x18,0xA9,0x49,0x69,0x51};memcpy(&b.memory.data[0x8000],p,sizeof p);
+    step(&c,&b);step(&c,&b);step(&c,&b);step(&c,&b);EQ8(c.A,0x9A);CHECK(!(c.P&FLAG_C));
+}
+
+static void test_nes_nrom_bus(void)
+{
+    const char *path="/tmp/mos6502-test.nes";uint8_t header[16]={ 'N','E','S',0x1A,1,1 };
+    uint8_t prg[16384]={0},chr[8192]={0};FILE *f=fopen(path,"wb");NES n;
+    prg[0]=0xF8;prg[1]=0x18;prg[2]=0xA9;prg[3]=0x49;prg[4]=0x69;prg[5]=0x51;
+    prg[0x3FFC]=0x00;prg[0x3FFD]=0x80;fwrite(header,1,sizeof header,f);fwrite(prg,1,sizeof prg,f);fwrite(chr,1,sizeof chr,f);fclose(f);
+    CHECK(nes_load(&n,path)==0);nes_reset(&n);EQ16(n.cpu.PC,0x8000);CHECK(!n.cpu.decimal_enabled);
+    bus_write(&n.bus,0x0001,0xAA);EQ8(bus_read(&n.bus,0x0801),0xAA);EQ8(bus_read(&n.bus,0xC000),0xF8);
+    nes_step(&n);nes_step(&n);nes_step(&n);nes_step(&n);EQ8(n.cpu.A,0x9A);
+    nes_set_controller(&n,0x05);bus_write(&n.bus,0x4016,1);bus_write(&n.bus,0x4016,0);
+    EQ8(bus_read(&n.bus,0x4016)&1,1);EQ8(bus_read(&n.bus,0x4016)&1,0);EQ8(bus_read(&n.bus,0x4016)&1,1);
+    remove(path);
+}
+
+static void write_test_rom(const char *path,uint8_t mapper,uint8_t prg_banks,uint8_t chr_banks)
+{
+    uint8_t h[16]={'N','E','S',0x1A,prg_banks,chr_banks,(uint8_t)(mapper<<4),0};FILE *f=fopen(path,"wb");
+    fwrite(h,1,sizeof h,f);
+    for(unsigned b=0;b<prg_banks;b++)for(unsigned i=0;i<16384;i++)fputc((int)b,f);
+    for(unsigned b=0;b<chr_banks;b++)for(unsigned i=0;i<8192;i++)fputc((int)(0x40+b),f);
+    fclose(f);
+}
+
+static void test_nes_mappers_and_apu(void)
+{
+    const char *u="/tmp/mos6502-urom.nes",*c="/tmp/mos6502-cnrom.nes";NES n;
+    write_test_rom(u,2,4,0);CHECK(nes_load(&n,u)==0);EQ8(n.mapper,2);EQ8(bus_read(&n.bus,0x8000),0);EQ8(bus_read(&n.bus,0xC000),3);
+    bus_write(&n.bus,0x8000,2);EQ8(bus_read(&n.bus,0x8000),2);EQ8(bus_read(&n.bus,0xC000),3);
+    write_test_rom(c,3,2,4);CHECK(nes_load(&n,c)==0);EQ8(n.mapper,3);EQ8(n.chr[0],0x40);bus_write(&n.bus,0x8000,3);EQ8(n.chr_bank,3);
+    bus_write(&n.bus,0x4000,0x3F);bus_write(&n.bus,0x4002,8);bus_write(&n.bus,0x4003,0);bus_write(&n.bus,0x4015,1);
+    CHECK(bus_read(&n.bus,0x4015)==1);float peak=0;for(unsigned i=0;i<1000;i++){float s=nes_audio_sample(&n,48000);if(s>peak)peak=s;}CHECK(peak>0.1f);
+    remove(u);remove(c);
+}
+
+static void test_nes_ppu_rendering(void)
+{
+    NES n;uint32_t pixels[256*240];memset(&n,0,sizeof n);n.chr_size=8192;n.chr_ram=true;n.ppu_mask=0x18;
+    n.palette[0]=0;n.palette[1]=1;n.palette[0x11]=2;n.chr[0]=0x80;n.chr[16]=0x80;
+    memset(n.oam,0xFF,sizeof n.oam);n.oam[0]=7;n.oam[1]=1;n.oam[2]=0;n.oam[3]=8;
+    nes_render_frame(&n,pixels);CHECK(n.ppu_status&0x40);CHECK(!(n.ppu_status&0x20));CHECK(pixels[8*256+8]!=pixels[8*256+9]);
+    for(unsigned s=0;s<9;s++){n.oam[s*4]=7;n.oam[s*4+3]=(uint8_t)(s*8+8);}nes_render_frame(&n,pixels);CHECK(n.ppu_status&0x20);
+}
+
+static void test_bus_hooks_and_apple1(void)
+{
+    Bus6502 b;Apple1IO io;bus_init(&b);apple1_init(&io,&b);apple1_key(&io,'a');
+    EQ8(bus_read(&b,0xD011),0x80);EQ8(bus_read(&b,0xD010),'A'|0x80);EQ8(bus_read(&b,0xD011),0);
+    bus_write(&b,0x1234,0x56);EQ8(bus_read(&b,0x1234),0x56);
+}
+
 int main(void)
 {
     test_reset_and_bus();test_load_store_and_modes();test_indirect_and_control();
-    test_alu_and_flags();test_stack_interrupts();test_branches_and_illegal();
+    test_alu_and_flags();test_stack_interrupts();test_branches_and_illegal();test_stable_undocumented();test_portable_state();test_bus_hooks_and_apple1();test_2a03_ignores_decimal();test_nes_nrom_bus();test_nes_mappers_and_apu();test_nes_ppu_rendering();
     printf("%d checks, %d failures\n",tests,failures);return failures?1:0;
 }

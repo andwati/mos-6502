@@ -10,7 +10,8 @@ typedef enum {
     O_INY, O_JMP, O_JSR, O_LDA, O_LDX, O_LDY, O_LSR, O_NOP, O_ORA,
     O_PHA, O_PHP, O_PLA, O_PLP, O_ROL, O_ROR, O_RTI, O_RTS, O_SBC,
     O_SEC, O_SED, O_SEI, O_STA, O_STX, O_STY, O_TAX, O_TAY, O_TSX,
-    O_TXA, O_TXS, O_TYA
+    O_TXA, O_TXS, O_TYA, O_LAX, O_SAX, O_DCP, O_ISC, O_SLO, O_RLA,
+    O_SRE, O_RRA, O_ANC, O_ALR, O_ARR, O_AXS
 } operation_t;
 
 typedef struct { operation_t op; addr_mode_t mode; uint8_t cycles; bool page; } opcode_t;
@@ -48,12 +49,24 @@ static const opcode_t ops[256] = {
     D(0xE8,INX,IMP,2,0), D(0xE9,SBC,IMM,2,0), D(0xEA,NOP,IMP,2,0), D(0xEC,CPX,ABS,4,0), D(0xED,SBC,ABS,4,0), D(0xEE,INC,ABS,6,0),
     D(0xF0,BEQ,REL,2,0), D(0xF1,SBC,INDY,5,1), D(0xF5,SBC,ZPX,4,0), D(0xF6,INC,ZPX,6,0),
     D(0xF8,SED,IMP,2,0), D(0xF9,SBC,ABSY,4,1), D(0xFD,SBC,ABSX,4,1), D(0xFE,INC,ABSX,7,0)
+    ,D(0xA3,LAX,INDX,6,0),D(0xA7,LAX,ZP,3,0),D(0xAF,LAX,ABS,4,0),D(0xB3,LAX,INDY,5,1),D(0xB7,LAX,ZPY,4,0),D(0xBF,LAX,ABSY,4,1)
+    ,D(0x83,SAX,INDX,6,0),D(0x87,SAX,ZP,3,0),D(0x8F,SAX,ABS,4,0),D(0x97,SAX,ZPY,4,0)
+    ,D(0xC3,DCP,INDX,8,0),D(0xC7,DCP,ZP,5,0),D(0xCF,DCP,ABS,6,0),D(0xD3,DCP,INDY,8,0),D(0xD7,DCP,ZPX,6,0),D(0xDB,DCP,ABSY,7,0),D(0xDF,DCP,ABSX,7,0)
+    ,D(0xE3,ISC,INDX,8,0),D(0xE7,ISC,ZP,5,0),D(0xEF,ISC,ABS,6,0),D(0xF3,ISC,INDY,8,0),D(0xF7,ISC,ZPX,6,0),D(0xFB,ISC,ABSY,7,0),D(0xFF,ISC,ABSX,7,0)
+    ,D(0x03,SLO,INDX,8,0),D(0x07,SLO,ZP,5,0),D(0x0F,SLO,ABS,6,0),D(0x13,SLO,INDY,8,0),D(0x17,SLO,ZPX,6,0),D(0x1B,SLO,ABSY,7,0),D(0x1F,SLO,ABSX,7,0)
+    ,D(0x23,RLA,INDX,8,0),D(0x27,RLA,ZP,5,0),D(0x2F,RLA,ABS,6,0),D(0x33,RLA,INDY,8,0),D(0x37,RLA,ZPX,6,0),D(0x3B,RLA,ABSY,7,0),D(0x3F,RLA,ABSX,7,0)
+    ,D(0x43,SRE,INDX,8,0),D(0x47,SRE,ZP,5,0),D(0x4F,SRE,ABS,6,0),D(0x53,SRE,INDY,8,0),D(0x57,SRE,ZPX,6,0),D(0x5B,SRE,ABSY,7,0),D(0x5F,SRE,ABSX,7,0)
+    ,D(0x63,RRA,INDX,8,0),D(0x67,RRA,ZP,5,0),D(0x6F,RRA,ABS,6,0),D(0x73,RRA,INDY,8,0),D(0x77,RRA,ZPX,6,0),D(0x7B,RRA,ABSY,7,0),D(0x7F,RRA,ABSX,7,0)
+    ,D(0x0B,ANC,IMM,2,0),D(0x2B,ANC,IMM,2,0),D(0x4B,ALR,IMM,2,0),D(0x6B,ARR,IMM,2,0),D(0xCB,AXS,IMM,2,0),D(0xEB,SBC,IMM,2,0)
+    ,D(0x1A,NOP,IMP,2,0),D(0x3A,NOP,IMP,2,0),D(0x5A,NOP,IMP,2,0),D(0x7A,NOP,IMP,2,0),D(0xDA,NOP,IMP,2,0),D(0xFA,NOP,IMP,2,0)
+    ,D(0x80,NOP,IMM,2,0),D(0x82,NOP,IMM,2,0),D(0x89,NOP,IMM,2,0),D(0xC2,NOP,IMM,2,0),D(0xE2,NOP,IMM,2,0)
+    ,D(0x04,NOP,ZP,3,0),D(0x44,NOP,ZP,3,0),D(0x64,NOP,ZP,3,0),D(0x14,NOP,ZPX,4,0),D(0x34,NOP,ZPX,4,0),D(0x54,NOP,ZPX,4,0),D(0x74,NOP,ZPX,4,0),D(0xD4,NOP,ZPX,4,0),D(0xF4,NOP,ZPX,4,0),D(0x0C,NOP,ABS,4,0),D(0x1C,NOP,ABSX,4,1),D(0x3C,NOP,ABSX,4,1),D(0x5C,NOP,ABSX,4,1),D(0x7C,NOP,ABSX,4,1),D(0xDC,NOP,ABSX,4,1),D(0xFC,NOP,ABSX,4,1)
 };
 #undef D
 
 size_t cpu_disassemble(Bus6502 *b, uint16_t pc, char *out, size_t size)
 {
-    static const char *names[]={"???","ADC","AND","ASL","BCC","BCS","BEQ","BIT","BMI","BNE","BPL","BRK","BVC","BVS","CLC","CLD","CLI","CLV","CMP","CPX","CPY","DEC","DEX","DEY","EOR","INC","INX","INY","JMP","JSR","LDA","LDX","LDY","LSR","NOP","ORA","PHA","PHP","PLA","PLP","ROL","ROR","RTI","RTS","SBC","SEC","SED","SEI","STA","STX","STY","TAX","TAY","TSX","TXA","TXS","TYA"};
+    static const char *names[]={"???","ADC","AND","ASL","BCC","BCS","BEQ","BIT","BMI","BNE","BPL","BRK","BVC","BVS","CLC","CLD","CLI","CLV","CMP","CPX","CPY","DEC","DEX","DEY","EOR","INC","INX","INY","JMP","JSR","LDA","LDX","LDY","LSR","NOP","ORA","PHA","PHP","PLA","PLP","ROL","ROR","RTI","RTS","SBC","SEC","SED","SEI","STA","STX","STY","TAX","TAY","TSX","TXA","TXS","TYA","LAX","SAX","DCP","ISC","SLO","RLA","SRE","RRA","ANC","ALR","ARR","AXS"};
     opcode_t d=ops[bus_read(b,pc)];uint8_t a=bus_read(b,(uint16_t)(pc+1));uint8_t z=bus_read(b,(uint16_t)(pc+2));
     const char *name=names[d.op];size_t bytes=1;
     switch(d.mode){
@@ -112,15 +125,21 @@ static void compare(CPU6502 *c, uint8_t reg, uint8_t val)
 static void adc(CPU6502 *c, uint8_t m)
 {
     uint8_t a = c->A, carry = !!(c->P & FLAG_C); uint16_t binary = (uint16_t)a + m + carry;
-    set_flag(c, FLAG_V, (~(a ^ m) & (a ^ (uint8_t)binary) & 0x80) != 0);
-    if (c->P & FLAG_D) {
-        uint16_t decimal = binary;
-        if ((a & 0x0F) + (m & 0x0F) + carry > 9) decimal += 6;
-        set_flag(c, FLAG_C, decimal > 0x99);
-        if (decimal > 0x99) decimal += 0x60;
-        c->A = (uint8_t)decimal;
-        set_flag(c, FLAG_Z, (uint8_t)binary == 0); set_flag(c, FLAG_N, binary & 0x80);
-    } else { set_flag(c, FLAG_C, binary > 0xFF); c->A = (uint8_t)binary; set_nz(c, c->A); }
+    if ((c->P & FLAG_D) && c->decimal_enabled) {
+        uint16_t low=(a&0x0F)+(m&0x0F)+carry;
+        uint16_t intermediate;
+        if(low>=0x0A)low=((low+6)&0x0F)+0x10;
+        intermediate=(a&0xF0)+(m&0xF0)+low;
+        set_flag(c,FLAG_Z,(uint8_t)binary==0);
+        set_flag(c,FLAG_N,intermediate&0x80);
+        set_flag(c,FLAG_V,(~(a^m)&(a^(uint8_t)intermediate)&0x80)!=0);
+        set_flag(c,FLAG_C,intermediate>=0xA0);
+        if(intermediate>=0xA0)intermediate+=0x60;
+        c->A=(uint8_t)intermediate;
+    } else {
+        set_flag(c,FLAG_V,(~(a^m)&(a^(uint8_t)binary)&0x80)!=0);
+        set_flag(c, FLAG_C, binary > 0xFF); c->A = (uint8_t)binary; set_nz(c, c->A);
+    }
 }
 
 static void sbc(CPU6502 *c, uint8_t m)
@@ -129,7 +148,7 @@ static void sbc(CPU6502 *c, uint8_t m)
     uint8_t result = (uint8_t)binary;
     set_flag(c, FLAG_V, ((a ^ result) & (a ^ m) & 0x80) != 0);
     set_flag(c, FLAG_C, binary > 0xFF); set_nz(c, result);
-    if (c->P & FLAG_D) {
+    if ((c->P & FLAG_D) && c->decimal_enabled) {
         int16_t lo = (a & 15) - (m & 15) - (carry ? 0 : 1);
         int16_t hi = (a >> 4) - (m >> 4);
         if (lo < 0) { lo -= 6; hi--; }
@@ -148,6 +167,7 @@ cpu_step_result_t cpu_step(CPU6502 *c, Bus6502 *b)
     if (c->irq_asserted && !(c->P & FLAG_I)) { interrupt(c,b,0xFFFE,false); out.cycles=7; return out; }
     out.opcode = bus_read(b, c->PC++); d = ops[out.opcode];
     if (d.op == O_BAD) { out.status = CPU_STEP_ILLEGAL_OPCODE; return out; }
+    if(d.op==O_JSR){uint8_t low=bus_read(b,c->PC++);uint16_t ret=c->PC;push(c,b,(uint8_t)(ret>>8));push(c,b,(uint8_t)ret);c->PC=(uint16_t)(low|((uint16_t)bus_read(b,c->PC)<<8));out.cycles=6;c->P|=FLAG_U;return out;}
     ar = address(c,b,d.mode); out.cycles = d.cycles + (d.page && ar.page_crossed);
     v = (d.mode == AM_IMP || d.mode == AM_ACC || d.mode == AM_REL) ? 0 : bus_read(b,ar.address);
     if (is_branch(d.op)) {
@@ -163,7 +183,7 @@ cpu_step_result_t cpu_step(CPU6502 *c, Bus6502 *b)
     case O_CMP:compare(c,c->A,v);break; case O_CPX:compare(c,c->X,v);break; case O_CPY:compare(c,c->Y,v);break;
     case O_DEC:v--;bus_write(b,ar.address,v);set_nz(c,v);break; case O_DEX:c->X--;set_nz(c,c->X);break; case O_DEY:c->Y--;set_nz(c,c->Y);break;
     case O_EOR:c->A^=v;set_nz(c,c->A);break; case O_INC:v++;bus_write(b,ar.address,v);set_nz(c,v);break; case O_INX:c->X++;set_nz(c,c->X);break; case O_INY:c->Y++;set_nz(c,c->Y);break;
-    case O_JMP:c->PC=ar.address;break; case O_JSR:{uint16_t ret=c->PC-1;push(c,b,(uint8_t)(ret>>8));push(c,b,(uint8_t)ret);c->PC=ar.address;}break;
+    case O_JMP:c->PC=ar.address;break; case O_JSR:break;
     case O_LDA:c->A=v;set_nz(c,v);break; case O_LDX:c->X=v;set_nz(c,v);break; case O_LDY:c->Y=v;set_nz(c,v);break;
     case O_LSR:old=d.mode==AM_ACC?c->A:v;set_flag(c,FLAG_C,old&1);old>>=1;set_nz(c,old);if(d.mode==AM_ACC)c->A=old;else bus_write(b,ar.address,old);break;
     case O_NOP:break; case O_ORA:c->A|=v;set_nz(c,c->A);break; case O_PHA:push(c,b,c->A);break; case O_PHP:push(c,b,c->P|FLAG_B|FLAG_U);break;
@@ -176,6 +196,18 @@ cpu_step_result_t cpu_step(CPU6502 *c, Bus6502 *b)
     case O_STA:bus_write(b,ar.address,c->A);break; case O_STX:bus_write(b,ar.address,c->X);break; case O_STY:bus_write(b,ar.address,c->Y);break;
     case O_TAX:c->X=c->A;set_nz(c,c->X);break; case O_TAY:c->Y=c->A;set_nz(c,c->Y);break; case O_TSX:c->X=c->SP;set_nz(c,c->X);break;
     case O_TXA:c->A=c->X;set_nz(c,c->A);break; case O_TXS:c->SP=c->X;break; case O_TYA:c->A=c->Y;set_nz(c,c->A);break;
+    case O_LAX:c->A=c->X=v;set_nz(c,v);break;
+    case O_SAX:bus_write(b,ar.address,c->A&c->X);break;
+    case O_DCP:v--;bus_write(b,ar.address,v);compare(c,c->A,v);break;
+    case O_ISC:v++;bus_write(b,ar.address,v);sbc(c,v);break;
+    case O_SLO:set_flag(c,FLAG_C,v&0x80);v<<=1;bus_write(b,ar.address,v);c->A|=v;set_nz(c,c->A);break;
+    case O_RLA:{bool nc=v&0x80;v=(uint8_t)((v<<1)|!!(c->P&FLAG_C));set_flag(c,FLAG_C,nc);bus_write(b,ar.address,v);c->A&=v;set_nz(c,c->A);}break;
+    case O_SRE:set_flag(c,FLAG_C,v&1);v>>=1;bus_write(b,ar.address,v);c->A^=v;set_nz(c,c->A);break;
+    case O_RRA:{bool nc=v&1;v=(uint8_t)((v>>1)|((c->P&FLAG_C)?0x80:0));set_flag(c,FLAG_C,nc);bus_write(b,ar.address,v);adc(c,v);}break;
+    case O_ANC:c->A&=v;set_nz(c,c->A);set_flag(c,FLAG_C,c->A&0x80);break;
+    case O_ALR:c->A&=v;set_flag(c,FLAG_C,c->A&1);c->A>>=1;set_nz(c,c->A);break;
+    case O_ARR:{uint8_t anded=c->A&v,result=(uint8_t)((anded>>1)|((c->P&FLAG_C)?0x80:0));set_nz(c,result);set_flag(c,FLAG_V,((result>>6)^(result>>5))&1);if((c->P&FLAG_D)&&c->decimal_enabled){if((anded&0x0F)+(anded&1)>5)result=(uint8_t)((result&0xF0)|((result+6)&0x0F));if((anded&0xF0)+(anded&0x10)>0x50){result+=0x60;set_flag(c,FLAG_C,true);}else set_flag(c,FLAG_C,false);c->A=result;}else{c->A=result;set_flag(c,FLAG_C,result&0x40);}}break;
+    case O_AXS:{uint8_t anded=c->A&c->X;set_flag(c,FLAG_C,anded>=v);c->X=(uint8_t)(anded-v);set_nz(c,c->X);}break;
     default:break;
     }
     c->P |= FLAG_U;

@@ -6,6 +6,7 @@
 #include <SDL2/SDL_ttf.h>
 #include <stdlib.h>
 #include <string.h>
+#include "state.h"
 
 static const uint32_t palette[16] = {
     0x071018FF,0x62F294FF,0xFF5D73FF,0x8FFFAFFF,0x638CFFFF,0xD879FFFF,
@@ -25,25 +26,6 @@ static void save_high_score(uint8_t score)
 {
     FILE *file=fopen("snake.highscore","wb");
     if(file){fputc(score,file);fclose(file);}
-}
-
-static bool save_state(const CPU6502 *cpu, const Bus6502 *bus)
-{
-    FILE *f=fopen("snake.state","wb");const char magic[8]="MOSST01";
-    if(!f)return false;
-    bool ok=fwrite(magic,1,8,f)==8&&fwrite(cpu,1,sizeof(*cpu),f)==sizeof(*cpu)&&
-            fwrite(bus->memory.data,1,MEM_SIZE,f)==MEM_SIZE;
-    return fclose(f)==0&&ok;
-}
-
-static bool load_state(CPU6502 *cpu, Bus6502 *bus)
-{
-    FILE *f=fopen("snake.state","rb");char magic[8];CPU6502 saved;
-    if(!f)return false;
-    bool ok=fread(magic,1,8,f)==8&&!memcmp(magic,"MOSST01",8)&&
-            fread(&saved,1,sizeof(saved),f)==sizeof(saved)&&
-            fread(bus->memory.data,1,MEM_SIZE,f)==MEM_SIZE;
-    fclose(f);if(ok){*cpu=saved;bus->framebuffer_dirty=true;}return ok;
 }
 
 static void play_tone(SDL_AudioDeviceID device, int frequency, int milliseconds)
@@ -197,10 +179,10 @@ int frontend_run(CPU6502 *cpu, Bus6502 *bus, unsigned hz, unsigned scale)
                     paused=!paused; budget=0; bus->framebuffer_dirty=true; update_title(window,score,high,paused);
                 }
                 else if(!event.key.repeat && k==SDLK_F5) {
-                    if(save_state(cpu,bus)) SDL_SetWindowTitle(window,"MOS 6502 Snake - State saved");
+                    if(state_save("snake.state",cpu,bus)==0) SDL_SetWindowTitle(window,"MOS 6502 Snake - State saved");
                 }
                 else if(!event.key.repeat && k==SDLK_F9) {
-                    if(load_state(cpu,bus)){score=bus->memory.data[0x00FD];game_state=bus->memory.data[0x00FB];update_title(window,score,high,paused);}
+                    if(state_load("snake.state",cpu,bus)==0){score=bus->memory.data[0x00FD];game_state=bus->memory.data[0x00FB];update_title(window,score,high,paused);}
                 }
                 else if(k==SDLK_w||k==SDLK_UP) bus_set_keyboard(bus,'w');
                 else if(k==SDLK_a||k==SDLK_LEFT) bus_set_keyboard(bus,'a');

@@ -6,8 +6,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: sudo apt-get update
-      - run: sudo apt-get install -y cc65 libsdl2-dev libsdl2-ttf-dev fonts-dejavu-core
+      - run: sudo apt-get install -y cc65 libsdl2-dev libsdl2-ttf-dev fonts-dejavu-core libc6-i386 unzip
       - run: make debug
       - run: make sanitize
       - run: make test-functional
-      - run: make games/snake.bin bin/mos6502-sdl
+      - run: make test-decimal
+      - run: make test-interrupt
+      - run: make test-apple1
+      - run: make test-nestest
+      - run: make test-vectors
+      - run: make games/snake.bin bin/mos6502-sdl bin/nes

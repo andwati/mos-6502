@@ -14,6 +14,9 @@ an explicit error.
 make                 # core and command-line emulator
 make test            # unit/integration checks
 make test-functional # official Klaus Dormann functional suite
+make test-decimal    # exhaustive NMOS BCD accumulator/flag suite
+make test-interrupt  # IRQ/NMI/BRK integration suite
+make test-vectors    # 2.36M independent single-instruction vectors (large download)
 make debug            # strict -Werror debug build and tests
 make sanitize         # AddressSanitizer/UBSan build and tests
 ```
@@ -49,6 +52,14 @@ bin/mos6502 program.bin --load 0x0600 --start 0x0600
 
 Useful options are `--hz`, `--scale`, `--seed`, `--headless`, and `--trace`.
 
+An interactive debugger provides stepping, continue, breakpoints, registers,
+memory examination/modification, disassembly, and save/load commands:
+
+```sh
+make bin/debugger
+bin/debugger program.bin 0x0600 0x0600
+```
+
 External functional ROMs can be run without modifying the application:
 
 ```sh
@@ -64,11 +75,39 @@ This is deliberately a small game-oriented computer, not an NES emulator.
 Original arcade Pac-Man used a Z80; running that ROM would require a different
 CPU and hardware platform.
 
+## Apple I
+
+The Apple I terminal target implements the keyboard/display PIA registers at
+`$D010-$D013`. Supply a legally obtained 256-byte Woz Monitor image and press
+Ctrl-C to exit:
+
+```sh
+make bin/apple1
+bin/apple1 WOZMON.bin
+```
+
+## Nintendo Entertainment System
+
+The NES target implements the Ricoh 2A03 CPU behavior, iNES parsing, mappers 0
+(NROM), 2 (UxROM), and 3 (CNROM), mirrored CPU RAM and PPU registers, controller shift register, OAM DMA,
+vblank/NMI timing, background scrolling/attributes, sprites, palette rendering,
+the pulse/triangle/noise APU channels, and an SDL video/audio frontend:
+
+```sh
+make bin/nes
+bin/nes game.nes
+```
+
+Controls are arrows, Z (B), X (A), Right Shift (Select), Enter (Start), and
+Escape. Use legally obtained ROMs. `make test-nestest` verifies all 8,991
+canonical CPU trace lines and cumulative cycle counts.
+
 See [the design](docs/design.md) and [project status](docs/plan.md).
 
 ## Validation status
 
-The in-tree tests exercise the CPU's major correctness boundaries. External
-Klaus Dormann functional and decimal ROM validation is the next hardening gate;
-the binaries are not vendored because their redistribution terms must be
-respected.
+The automated suite passes Klaus Dormann's functional and interrupt ROMs,
+Bruce Clark's exhaustive decimal test, all 8,991 canonical `nestest` trace
+lines, an authentic Woz Monitor interaction, and 2,360,000 SingleStepTests
+vectors. Downloaded fixtures are checksum-verified or cached locally rather
+than vendored.
