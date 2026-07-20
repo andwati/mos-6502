@@ -64,14 +64,14 @@ Upon power-up or a reset signal, the 6502 does not begin execution at a random a
 # Opcode Decoding and Instruction Dispatch
 The core of the emulator is the execution loop, which performs the Fetch-Decode-Execute sequence. Every 6502 instruction begins with a 1-byte opcode. There are 256 possible opcodes, though only 56 are officially documented. 
 
-## Dispatch Decision: Switch vs. Jump Tables
-A critical design decision is how to dispatch these 256 opcodes. Three primary methods exist in C:
+## Opcode Metadata and Dispatch
 
-1. Giant Switch Statement: A 256-case switch block. Most compilers optimize this into a highly efficient jump table. It is readable and allows for easy inlining of small instruction logic.   
-1. Array of Function Pointers: An array where `dispatch[opcode]` points to a dedicated function. This is modular but incurs function call overhead and can be slower on modern CPUs due to pointer dereferencing.
-1. Computed Gotos: A GCC extension (`goto *labels[opcode]`). This is the fastest for high-performance interpreters but is non-standard.   
-
-For this design document, a Giant Switch Statement is recommended. This approach balances performance, maintainability, and portability, allowing the compiler to perform optimal branch prediction. 
+The implementation uses a 256-entry metadata table. Each official opcode maps
+to an operation, addressing mode, base cycle count, and page-cross policy. A
+shared operation switch then executes the decoded instruction. This keeps all
+151 official encodings auditable without duplicating instruction behavior or
+using non-standard computed gotos. Empty table entries are deterministic
+illegal-opcode errors.
 
 # Addressing Mode Architecture
 Addressing modes are the rules for calculating the effective memory address of an operand. Decoupling these from the instruction logic is essential to avoid a combinatorial explosion of code (e.g., LDA has 8 different opcodes for different modes).

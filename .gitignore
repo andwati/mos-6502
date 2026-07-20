@@ -76,5 +76,9 @@ dkms.conf
 
 bin/
 build/
+games/snake.bin
+snake.highscore
+snake.state
+tests/roms/*.bin
 
 # End of https://www.toptal.com/developers/gitignore/api/c,visualstudiocode

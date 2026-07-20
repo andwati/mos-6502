@@ -1,23 +1,21 @@
 #include <stdio.h>
+#include <string.h>
+#include "bus.h"
 #include "cpu.h"
 
-void cpu_reset(CPU6502 *cpu)
+void cpu_reset(CPU6502 *cpu, Bus6502 *bus)
 {
-    cpu->A = 0;
-    cpu->X = 0;
-    cpu->Y = 0;
-    cpu->SP = 0xFD;   // typical 6502 reset value??
-    cpu->P = FLAG_U;  // unused flag always 1
-    cpu->PC = 0x0000; // loaded later from reset vector
+    memset(cpu, 0, sizeof(*cpu));
+    cpu->SP = 0xFD;
+    cpu->P = FLAG_U | FLAG_I;
+    cpu->PC = bus_read16(bus, 0xFFFC);
 }
 
-void cpu_print_state(CPU6502 *cpu)
+void cpu_request_nmi(CPU6502 *cpu) { cpu->nmi_pending = true; }
+void cpu_set_irq(CPU6502 *cpu, bool asserted) { cpu->irq_asserted = asserted; }
+
+void cpu_print_state(const CPU6502 *cpu)
 {
-    printf("CPU State:\n");
-    printf("A:  0x%02X\n", cpu->A);
-    printf("X:  0x%02X\n", cpu->X);
-    printf("Y:  0x%02X\n", cpu->Y);
-    printf("SP: 0x%02X\n", cpu->SP);
-    printf("PC: 0x%04X\n", cpu->PC);
-    printf("P:  0x%02X\n", cpu->P);
+    printf("PC:%04X A:%02X X:%02X Y:%02X P:%02X SP:%02X\n",
+           cpu->PC, cpu->A, cpu->X, cpu->Y, cpu->P, cpu->SP);
 }
